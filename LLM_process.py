@@ -7,14 +7,18 @@ LLM take input
 
 
 """
-import ollama
+from langchain_ollama import OllamaLLM
+from langchain_core.prompts import ChatPromptTemplate
 
-ollama.pull("gemma:3b")
-async def LLM_proc(data):
-    system_prompt = "You are an emotional translator for blind people. Explain to blind people what is sent, including data and coordinates."
-    full_prompt = f"{system_prompt}\n{data}"
-    response = ollama.generate(
-        model="gemma:3b",
-        prompt=full_prompt,
-        stream=True
-    )
+def LLM_proc(data,user):
+    template = """
+    You are assistance to blind people, and need to answer questions about the object. Respond with only 1 sentence. The details of the object is:
+    {data}
+    Here is the user request: {user}
+    """
+    model = OllamaLLM(model="gemma3")
+    prompt =  ChatPromptTemplate.from_template(template)
+    chain = prompt|model
+    result = chain.invoke({"data":data,"user":user})
+    print(result)
+    return result
