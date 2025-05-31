@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'dart:convert';
+import 'dart:io';
+import 'dart:html' as html;
+import 'package:flutter_tts/flutter_tts.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -14,10 +19,23 @@ class _HomePageState extends State<HomePage> {
   bool _isCameraReady = false;
   String feedbackText = "Tap the mic and ask what's around you.";
 
+  late stt.SpeechToText _speech;
+  bool _isListening = false;
+
+  final FlutterTts _flutterTts = FlutterTts();
+
   @override
   void initState() {
     super.initState();
+    _requestPermissions();
     _initializeCamera();
+    _speech = stt.SpeechToText();
+  }
+
+  void _requestPermissions() async {
+    if (kIsWeb) {
+      await html.window.navigator.mediaDevices?.getUserMedia({'video': true, 'audio': true});
+    }
   }
 
   Future<void> _initializeCamera() async {
@@ -38,11 +56,166 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  void onVoiceCommand() {
-    // Replace with STT + Vision + TTS later
+  Future<void> captureAndConvertImage() async {
+    if (!_cameraController.value.isInitialized || _cameraController.value.isTakingPicture) return;
+
+    try {
+      final XFile imageFile = await _cameraController.takePicture();
+      final bytes = await imageFile.readAsBytes();
+      final base64Image = base64Encode(bytes);
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+
+      // Download image
+      final blobImage = html.Blob([bytes]);
+      final urlImage = html.Url.createObjectUrlFromBlob(blobImage);
+      final anchorImage = html.AnchorElement(href: urlImage)
+        ..setAttribute("download", "image_$timestamp.jpg")
+        ..click();
+      html.Url.revokeObjectUrl(urlImage);
+
+      // Download JSON
+      final imageJson = jsonEncode({"image_base64": base64Image});
+      final blobJson = html.Blob([imageJson]);
+      final urlJson = html.Url.createObjectUrlFromBlob(blobJson);
+      final anchorJson = html.AnchorElement(href: urlJson)
+        ..setAttribute("download", "image_$timestamp.json")
+        ..click();
+      html.Url.revokeObjectUrl(urlJson);
+
+      setState(() {
+        feedbackText = "📥 Files downloaded: image_$timestamp.jpg & image_$timestamp.json";
+      });
+
+    } catch (e) {
+      print("Image capture failed: $e");
+    }
+  }
+
+  void startListening() async {
+    if (_isListening) return;
+
     setState(() {
-      feedbackText = "There is a crosswalk ahead and a person nearby.";
+      feedbackText = ""; // Clear console at the beginning of new input
     });
+
+    bool available = await _speech.initialize(
+      onStatus: (val) {},
+      onError: (val) => print('Error: $val'),
+    );
+    if (available) {
+      setState(() => _isListening = true);
+      _speech.listen(
+        onResult: (val) {
+          if (_isListening) {
+            setState(() {
+              feedbackText = val.recognizedWords;
+            });
+          }
+        },
+      );
+    }
+  }
+
+  void stopListening() async {
+    if (_isListening) {
+      await _speech.stop();
+      setState(() {
+        _isListening = false;
+        feedbackText = ""; // Clear console
+      });
+
+      await captureAndConvertImage();
+
+      Future.delayed(const Duration(milliseconds: 500), () {
+        setState(() {
+          feedbackText = "🤖 Please wait, the AI is analyzing...";
+        });
+      });
+
+      Future.delayed(const Duration(seconds: 2), () {
+        speakDummyResponse();
+      });
+    }
+  }
+
+  Future<void> speakDummyResponse() async {
+    const dummyResponse = "It's definitely with Saim, check his pockets! Apparently he has a thing for spoons.";
+
+    final words = dummyResponse.split(" ");
+    const wordDelay = Duration(milliseconds: 350);
+
+    if (kIsWeb) {
+      final synth = html.window.speechSynthesis;
+      if (synth != null) {
+        final html.SpeechSynthesisUtterance utterance = html.SpeechSynthesisUtterance()
+          ..text = dummyResponse
+          ..lang = 'en-US'
+          ..rate = 0.9;
+
+        final voices = synth.getVoices();
+        final preferredVoice = voices.firstWhere(
+          (v) =>
+              (v.name?.toLowerCase().contains("male") == true ||
+               v.name?.toLowerCase().contains("wavenet") == true ||
+               v.name?.toLowerCase().contains("en-us") == true),
+          orElse: () => voices.first,
+        );
+        utterance.voice = preferredVoice;
+
+        synth.cancel();
+        synth.speak(utterance);
+
+        setState(() {
+          feedbackText = "";
+        });
+
+        for (int i = 0; i < words.length; i++) {
+          Future.delayed(wordDelay * i, () {
+            setState(() {
+              feedbackText += "${words[i]} ";
+            });
+          });
+        }
+
+        Future.delayed(wordDelay * words.length + const Duration(seconds: 3), () {
+          if (!_isListening) {
+            setState(() {
+              feedbackText = "Tap the mic and ask what’s around you.";
+            });
+          }
+        });
+      }
+    } else {
+      await _flutterTts.setLanguage("en-US");
+      await _flutterTts.setSpeechRate(0.45);
+      await _flutterTts.setPitch(1.0);
+      await _flutterTts.setVoice({
+        "name": "en-us-x-sfg#male_1-local",
+        "locale": "en-US",
+      });
+
+      setState(() {
+        feedbackText = "";
+      });
+
+      for (int i = 0; i < words.length; i++) {
+        Future.delayed(wordDelay * i, () {
+          setState(() {
+            feedbackText += "${words[i]} ";
+          });
+        });
+      }
+
+      Future.delayed(wordDelay * words.length + const Duration(seconds: 3), () {
+        if (!_isListening) {
+          setState(() {
+            feedbackText = "Tap the mic and ask what’s around you.";
+          });
+        }
+      });
+
+      await _flutterTts.speak(dummyResponse);
+    }
   }
 
   @override
@@ -64,18 +237,43 @@ class _HomePageState extends State<HomePage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  ElevatedButton.icon(
-                    onPressed: onVoiceCommand,
-                    icon: const Icon(Icons.mic, size: 32),
-                    label: const Text(
-                      "Ask a Question",
-                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.deepPurpleAccent,
-                      minimumSize: const Size(double.infinity, 70),
-                      shape: RoundedRectangleBorder(
+                  GestureDetector(
+                    onTapDown: (_) => startListening(),
+                    onTapUp: (_) => stopListening(),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeInOut,
+                      decoration: BoxDecoration(
+                        color: _isListening ? Colors.redAccent : Colors.deepPurpleAccent,
                         borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          if (_isListening)
+                            BoxShadow(
+                              color: Colors.redAccent.withOpacity(0.6),
+                              blurRadius: 12,
+                              spreadRadius: 2,
+                            ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.mic,
+                            size: 32,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            _isListening ? "Listening..." : "Hold to Speak",
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

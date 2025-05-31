@@ -34,6 +34,8 @@ dependencies:
   camera: ^0.10.5+7
   camera_web: ^0.3.1+1
   web: ^0.5.1
+  speech_to_text: ^6.4.1
+  flutter_tts: ^3.8.3
 
 dev_dependencies:
   flutter_test:
