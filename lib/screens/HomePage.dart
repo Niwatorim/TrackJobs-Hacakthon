@@ -3,9 +3,10 @@ import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'dart:convert';
-import 'dart:io';
-import 'dart:html' as html;
+import 'dart:typed_data';
+import 'package:http/http.dart' as http;
 import 'package:flutter_tts/flutter_tts.dart';
+import 'dart:html' as html;
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -87,7 +88,44 @@ class _HomePageState extends State<HomePage> {
       });
 
     } catch (e) {
-      print("Image capture failed: $e");
+      debugPrint("Image capture failed: $e");
+    }
+  }
+
+  Future<String?> sendToWebcamAPI({
+    required Uint8List imageBytes,
+    required String userContent,
+    required int frameHeight,
+    required int frameWidth,
+  }) async {
+    final base64Image = base64Encode(imageBytes);
+    final uri = Uri.parse('http://192.168.40.67:5000/'); // Replace with actual endpoint
+
+    final body = jsonEncode({
+      "img": base64Image.toString(),
+      "user": userContent,
+      "frameHeight": frameHeight,
+      "frameWidth": frameWidth,
+    });
+
+    try {
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: body,
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = jsonDecode(response.body);
+        debugPrint("✅ API response received: ${data['msg']}");
+        return data['msg'];
+      } else {
+        debugPrint('API Error: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('API Exception: $e');
+      return null;
     }
   }
 
@@ -118,91 +156,65 @@ class _HomePageState extends State<HomePage> {
 
   void stopListening() async {
     if (_isListening) {
-      await _speech.stop();
+      final userSpeech = feedbackText;
       setState(() {
         _isListening = false;
-        feedbackText = ""; // Clear console
+        feedbackText = "🤖 AI is analyzing...";
       });
 
-      await captureAndConvertImage();
+      await _speech.stop();
 
-      Future.delayed(const Duration(milliseconds: 500), () {
-        setState(() {
-          feedbackText = "🤖 Please wait, the AI is analyzing...";
-        });
-      });
+      // Ensure UI updates before heavy work
+      await Future.delayed(const Duration(milliseconds: 100));
 
-      Future.delayed(const Duration(seconds: 2), () {
-        speakDummyResponse();
-      });
+      final imageFile = await _cameraController.takePicture();
+      final bytes = await imageFile.readAsBytes();
+
+      final msg = await sendToWebcamAPI(
+        imageBytes: bytes,
+        userContent: userSpeech,
+        frameHeight: _cameraController.value.previewSize?.height.toInt() ?? 0,
+        frameWidth: _cameraController.value.previewSize?.width.toInt() ?? 0,
+      );
+
+      if (msg != null && msg.trim().isNotEmpty) {
+        speakTextResponse(msg);
+      } else {
+        speakTextResponse("Sorry, I couldn't analyze the image.");
+      }
     }
   }
 
-  Future<void> speakDummyResponse() async {
-    const dummyResponse = "It's definitely with Saim, check his pockets! Apparently he has a thing for spoons.";
-
-    final words = dummyResponse.split(" ");
+  Future<void> speakTextResponse(String responseText) async {
+    final words = responseText.split(" ");
     const wordDelay = Duration(milliseconds: 350);
 
     if (kIsWeb) {
       final synth = html.window.speechSynthesis;
       if (synth != null) {
-        final html.SpeechSynthesisUtterance utterance = html.SpeechSynthesisUtterance()
-          ..text = dummyResponse
+        final utterance = html.SpeechSynthesisUtterance()
+          ..text = responseText
           ..lang = 'en-US'
-          ..rate = 0.9;
+          ..rate = 1.0;
 
         final voices = synth.getVoices();
-        final preferredVoice = voices.firstWhere(
-          (v) =>
-              (v.name?.toLowerCase().contains("male") == true ||
-               v.name?.toLowerCase().contains("wavenet") == true ||
-               v.name?.toLowerCase().contains("en-us") == true),
-          orElse: () => voices.first,
-        );
-        utterance.voice = preferredVoice;
-
-        synth.cancel();
-        synth.speak(utterance);
-
-        setState(() {
-          feedbackText = "";
-        });
-
-        for (int i = 0; i < words.length; i++) {
-          Future.delayed(wordDelay * i, () {
-            setState(() {
-              feedbackText += "${words[i]} ";
-            });
-          });
+        if (voices.isNotEmpty) {
+          final preferredVoice = voices.firstWhere(
+            (v) => v.name?.toLowerCase().contains("male") ?? false,
+            orElse: () => voices.first,
+          );
+          utterance.voice = preferredVoice;
         }
 
-        Future.delayed(wordDelay * words.length + const Duration(seconds: 3), () {
-          if (!_isListening) {
-            setState(() {
-              feedbackText = "Tap the mic and ask what’s around you.";
-            });
-          }
-        });
+        debugPrint("🎤 Speaking out the response: $responseText");
+        synth.cancel();
+        synth.speak(utterance);
       }
-    } else {
-      await _flutterTts.setLanguage("en-US");
-      await _flutterTts.setSpeechRate(0.45);
-      await _flutterTts.setPitch(1.0);
-      await _flutterTts.setVoice({
-        "name": "en-us-x-sfg#male_1-local",
-        "locale": "en-US",
-      });
 
-      setState(() {
-        feedbackText = "";
-      });
-
+      setState(() => feedbackText = "");
       for (int i = 0; i < words.length; i++) {
         Future.delayed(wordDelay * i, () {
-          setState(() {
-            feedbackText += "${words[i]} ";
-          });
+          setState(() => feedbackText += "${words[i]} ");
         });
       }
 
@@ -213,8 +225,6 @@ class _HomePageState extends State<HomePage> {
           });
         }
       });
-
-      await _flutterTts.speak(dummyResponse);
     }
   }
 
