@@ -206,7 +206,7 @@ class _HomePageState extends State<HomePage> {
           utterance.voice = preferredVoice;
         }
 
-        debugPrint("🎤 Speaking out the response: $responseText");
+        ("🎤 Speaking out the response: $responseText");
         synth.cancel();
         synth.speak(utterance);
       }
