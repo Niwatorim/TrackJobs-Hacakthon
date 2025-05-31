@@ -1,0 +1,82 @@
+[
+    {
+        "input": "USER: Is there a spoon nearby?\nOBJECTS: [{\"name\": \"spoon\", \"direction\": \"left\", \"distance\": 0.5}]",
+        "output": "ASSISTANT: There's a spoon to your left, about half a meter away - well within arm's reach."
+    },
+    {
+        "input": "USER: What's around me?\nOBJECTS: [{\"name\": \"spoon\", \"direction\": \"front\", \"distance\": 1.2}]",
+        "output": "ASSISTANT: I can see a spoon about 1.2 meters ahead of you."
+    },
+    {
+        "input": "USER: Are there any utensils on my right?\nOBJECTS: [{\"name\": \"spoon\", \"direction\": \"right\", \"distance\": 0.3}]",
+        "output": "ASSISTANT: Yes, there's a spoon just to your right, easily within grabbing distance."
+    },
+    {
+        "input": "USER: Describe what's near me?\nOBJECTS: [{\"name\": \"spoon\", \"direction\": \"top-right\", \"distance\": 0.8}]",
+        "output": "ASSISTANT: There's a spoon up and to your right, roughly an arm's length away."
+    },
+    {
+        "input": "USER: Can you find me a spoon?\nOBJECTS: [{\"name\": \"spoon\", \"direction\": \"bottom-left\", \"distance\": 0.6}]",
+        "output": "ASSISTANT: Found one! A spoon is down and to your left, about 60 centimeters away."
+    },
+    {
+        "input": "USER: What objects are in front of me?\nOBJECTS: [{\"name\": \"spoon\", \"direction\": \"front\", \"distance\": 1.5}]",
+        "output": "ASSISTANT: There's a spoon positioned straight ahead, approximately 1.5 meters from you."
+    },
+    {
+        "input": "USER: Do you see any spoons?\nOBJECTS: [{\"name\": \"spoon\", \"direction\": \"back\", \"distance\": 0.4}]",
+        "output": "ASSISTANT: There's a spoon behind you, very close - just 40 centimeters away."
+    },
+    {
+        "input": "USER: Where's the nearest spoon?\nOBJECTS: [{\"name\": \"spoon\", \"direction\": \"right\", \"distance\": 0.2}]",
+        "output": "ASSISTANT: The closest spoon is right beside you, just 20 centimeters to your right."
+    },
+    {
+        "input": "USER: What's to my left?\nOBJECTS: [{\"name\": \"spoon\", \"direction\": \"left\", \"distance\": 1.0}]",
+        "output": "ASSISTANT: You have a spoon on your left, about 1 meter away - you could reach it with a slight stretch."
+    },
+    {
+        "input": "USER: Are there any spoons within reach?\nOBJECTS: [{\"name\": \"spoon\", \"direction\": \"front\", \"distance\": 0.7}]",
+        "output": "ASSISTANT: Yes, there's a spoon directly in front of you, 70 centimeters away - easily reachable."
+    },
+    {
+        "input": "USER: Where’s that spoon?\nOBJECTS: [{\"name\": \"spoon\", \"direction\": \"right\", \"distance\": 0.4}]",
+        "output": "ASSISTANT: Right side, just 40cm away. Looks like it’s waiting for you to notice it."
+    },
+    {
+        "input": "USER: Did someone move the spoon?\nOBJECTS: [{\"name\": \"spoon\", \"direction\": \"left\", \"distance\": 1.1}]",
+        "output": "ASSISTANT: Looks like it’s about 1.1 meters to your left now. Suspicious activity or just forgetfulness?"
+    },
+    {
+        "input": "USER: I can't find the spoon!\nOBJECTS: [{\"name\": \"spoon\", \"direction\": \"front\", \"distance\": 0.6}]",
+        "output": "ASSISTANT: No worries, it's right in front of you—just 60cm away."
+    },
+    {
+        "input": "USER: Spoon check.\nOBJECTS: [{\"name\": \"spoon\", \"direction\": \"top-left\", \"distance\": 0.9}]",
+        "output": "ASSISTANT: Confirmed. Spoon detected up to your left at 0.9 meters. Should I log this in the official spoon registry?"
+    },
+    {
+        "input": "USER: Show me where the spoon is.\nOBJECTS: [{\"name\": \"spoon\", \"direction\": \"bottom-right\", \"distance\": 0.7}]",
+        "output": "ASSISTANT: Zooming in... spoon spotted below and to the right, 70cm out. Ready to retrieve it?"
+    },
+    {
+        "input": "USER: I need to stir this.\nOBJECTS: [{\"name\": \"spoon\", \"direction\": \"front\", \"distance\": 0.5}]",
+        "output": "ASSISTANT: Then good news—spoon's straight ahead, half a meter. Stir away!"
+    },
+    {
+        "input": "USER: I'm making tea.\nOBJECTS: [{\"name\": \"spoon\", \"direction\": \"left\", \"distance\": 0.8}]",
+        "output": "ASSISTANT: Perfect timing. There’s a spoon just 0.8 meters to your left. Need anything else?"
+    },
+    {
+        "input": "USER: What's close to me?\nOBJECTS: [{\"name\": \"spoon\", \"direction\": \"back\", \"distance\": 0.3}]",
+        "output": "ASSISTANT: Closest item? A spoon chilling behind you at 30cm. Kind of sneaky, huh?"
+    },
+    {
+        "input": "USER: Can you tell me what's near?\nOBJECTS: [{\"name\": \"spoon\", \"direction\": \"top-right\", \"distance\": 1.2}]",
+        "output": "ASSISTANT: Sure can! There's a spoon about 1.2 meters up and to your right. Planning to use it?"
+    },
+    {
+        "input": "USER: Locate cutlery.\nOBJECTS: [{\"name\": \"spoon\", \"direction\": \"bottom-left\", \"distance\": 0.4}]",
+        "output": "ASSISTANT: Detected! Spoon’s hanging out down and left at 40cm. Fancy a snack?"
+    }
+]
