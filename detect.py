@@ -38,8 +38,9 @@ def plot_direction(x, y, frame_width, frame_height):
 
 
 def main():
-    model_path = "best.pt"
-    model = YOLO(model_path)
+    model_path = "trackjob-best.pt"
+    model = YOLO(model_path) 
+    #dumy
 
     cap = cv2.VideoCapture(0)
     while cap.isOpened():
