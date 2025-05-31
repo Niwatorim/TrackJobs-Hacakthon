@@ -1,0 +1,34 @@
+Post in json: (faster if hash)
+data=[object, direction, distance]
+
+direction:
+right
+left
+up
+down
+top right
+top left
+bottom right
+bottom left
+front
+
+Literal:
+A {object} is {distance} on your {direction}
+Thats only an arms length away from you!
+
+Emotional:
+{object} is {distance} on your {direction}
+That means you are ready to eat
+
+
+
+
+
+send thru to LLM, generate coordinates
+-   system prompts: ur an emotional translator for blind people, and I need you to explain to blind people what is sent, which you will recieve the following content, of data and coordinates etc.
+-   user prompts: data object
+
+API response = LLM response
+send 200 if yea
+
+send 400 if error, respond error 
