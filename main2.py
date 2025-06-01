@@ -36,7 +36,8 @@ def base64_to_image_array(base64_str):
     return np.array(image)
 
 def convert_to_distance(p):
-    return (p / 1000) * 2
+    k=(1/7)
+    return (1000 / p) * 2 *k
 
 def plot_direction(x, y, frame_width, frame_height):
     width_third = frame_width / 3
