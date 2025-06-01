@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:html' as html;
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:flutter_tts/flutter_tts.dart';
-import 'dart:html' as html;
+import 'dart:async';
+
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -22,8 +24,15 @@ class _HomePageState extends State<HomePage> {
 
   late stt.SpeechToText _speech;
   bool _isListening = false;
+  bool _isAwaitingResponse = false;
+
+  bool _isListeningFind = false;
+  bool _isAwaitingResponseFind = false;
 
   final FlutterTts _flutterTts = FlutterTts();
+
+  bool _isLooping = false;
+  Timer? _loopTimer;
 
   @override
   void initState() {
@@ -97,9 +106,10 @@ class _HomePageState extends State<HomePage> {
     required String userContent,
     required int frameHeight,
     required int frameWidth,
+    String endpoint = '/',
   }) async {
     final base64Image = base64Encode(imageBytes);
-    final uri = Uri.parse('http://192.168.40.67:5000/'); // Replace with actual endpoint
+    final uri = Uri.parse('http://192.168.40.67:5000$endpoint'); // Replace with actual endpoint
 
     final body = jsonEncode({
       "img": base64Image.toString(),
@@ -130,7 +140,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void startListening() async {
-    if (_isListening) return;
+    if (_isAwaitingResponse) return;
 
     setState(() {
       feedbackText = ""; // Clear console at the beginning of new input
@@ -141,7 +151,10 @@ class _HomePageState extends State<HomePage> {
       onError: (val) => print('Error: $val'),
     );
     if (available) {
-      setState(() => _isListening = true);
+      setState(() {
+        _isListening = true;
+        _isAwaitingResponse = true;
+      });
       _speech.listen(
         onResult: (val) {
           if (_isListening) {
@@ -155,6 +168,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void stopListening() async {
+    debugPrint("Inside stopListening");
     if (_isListening) {
       final userSpeech = feedbackText;
       setState(() {
@@ -178,14 +192,119 @@ class _HomePageState extends State<HomePage> {
       );
 
       if (msg != null && msg.trim().isNotEmpty) {
-        speakTextResponse(msg);
+        await speakTextResponse(msg);
       } else {
-        speakTextResponse("Sorry, I couldn't analyze the image.");
+        await speakTextResponse("Sorry, I couldn't analyze the image.");
       }
+      setState(() => _isAwaitingResponse = false);
     }
   }
 
+  void startListeningFind() async {
+    if (_isAwaitingResponseFind) return;
+    setState(() {
+      feedbackText = "";
+    });
+
+    bool available = await _speech.initialize(
+      onStatus: (val) {},
+      onError: (val) => print('Error: $val'),
+    );
+    if (available) {
+      setState(() {
+        _isListeningFind = true;
+        _isAwaitingResponseFind = true;
+      });
+      _speech.listen(
+        onResult: (val) {
+          if (_isListeningFind) {
+            setState(() {
+              feedbackText = val.recognizedWords;
+            });
+          }
+        },
+      );
+    }
+  }
+
+  void stopListeningFind() async {
+    debugPrint("Inside stopListeningFind");
+    if (_isListeningFind) {
+      final userSpeech = feedbackText;
+      setState(() {
+        _isListeningFind = false;
+        feedbackText = "🔍 Finding...";
+      });
+
+      await _speech.stop();
+
+      await Future.delayed(const Duration(milliseconds: 100));
+      final imageFile = await _cameraController.takePicture();
+      final bytes = await imageFile.readAsBytes();
+
+      final msg = await sendToWebcamAPI(
+        imageBytes: bytes,
+        userContent: userSpeech,
+        frameHeight: _cameraController.value.previewSize?.height.toInt() ?? 0,
+        frameWidth: _cameraController.value.previewSize?.width.toInt() ?? 0,
+        endpoint: "/find",
+      );
+
+      if (msg != null && msg.trim().isNotEmpty) {
+        await speakTextResponse(msg);
+      } else {
+        await speakTextResponse("Sorry, I couldn't find anything.");
+      }
+
+      setState(() => _isAwaitingResponseFind = false);
+    }
+  }
+
+  // Fixed input loop for identifying spoon (no microphone)
+  void startFixedLoop() async {
+    debugPrint("hi i am inside here");
+
+    // Prevent multiple timers
+    _loopTimer?.cancel();
+
+    setState(() {
+      _isLooping = true;
+      feedbackText = "🔴 Identifying object...";
+    });
+
+    while (_isLooping) {
+      debugPrint("📤 Sending fixed speech content: It's a spoon for sure");
+
+      final imageFile = await _cameraController.takePicture();
+      final bytes = await imageFile.readAsBytes();
+
+      final msg = await sendToWebcamAPI(
+        imageBytes: bytes,
+        userContent: "It's a spoon for sure",
+        frameHeight: _cameraController.value.previewSize?.height.toInt() ?? 0,
+        frameWidth: _cameraController.value.previewSize?.width.toInt() ?? 0,
+        endpoint: "/find",
+      );
+
+      debugPrint("📥 Received response: $msg");
+
+      if (msg != null && msg.trim().isNotEmpty) {
+        await speakTextResponse(msg);
+      } else {
+        await speakTextResponse("Sorry, I couldn't analyze the image.");
+      }
+
+      // Wait 5 seconds after TTS finishes before next loop
+      await Future.delayed(const Duration(seconds: 10));
+    }
+
+    debugPrint("🛑 Loop stopped.");
+  }
+
   Future<void> speakTextResponse(String responseText) async {
+    if (_speech.isListening) {
+      await _speech.stop();
+    }
     final words = responseText.split(" ");
     const wordDelay = Duration(milliseconds: 350);
 
@@ -219,7 +338,7 @@ class _HomePageState extends State<HomePage> {
       }
 
       Future.delayed(wordDelay * words.length + const Duration(seconds: 3), () {
-        if (!_isListening) {
+        if (!_isListening && !_isListeningFind && !_isLooping) {
           setState(() {
             feedbackText = "Tap the mic and ask what’s around you.";
           });
@@ -247,45 +366,107 @@ class _HomePageState extends State<HomePage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  GestureDetector(
-                    onTapDown: (_) => startListening(),
-                    onTapUp: (_) => stopListening(),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeInOut,
-                      decoration: BoxDecoration(
-                        color: _isListening ? Colors.redAccent : Colors.deepPurpleAccent,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          if (_isListening)
-                            BoxShadow(
-                              color: Colors.redAccent.withOpacity(0.6),
-                              blurRadius: 12,
-                              spreadRadius: 2,
+                  Row(
+                    children: [
+                      // Mic button ("Hold to Ask")
+                      Expanded(
+                        child: GestureDetector(
+                          onTapDown: (_) {
+                            if (!_isAwaitingResponse) {
+                              setState(() => _isListening = true);
+                              startListening();
+                            }
+                          },
+                          onTapUp: (_) async {
+                            stopListening();
+                            setState(() => _isListening = false);
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeInOut,
+                            decoration: BoxDecoration(
+                              color: _isListening ? Colors.redAccent : Colors.blue,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                if (_isListening)
+                                  BoxShadow(
+                                    color: Colors.redAccent.withOpacity(0.6),
+                                    blurRadius: 12,
+                                    spreadRadius: 2,
+                                  ),
+                              ],
                             ),
-                        ],
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.mic,
-                            size: 32,
-                            color: Colors.white,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            _isListening ? "Listening..." : "Hold to Speak",
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.mic, size: 24, color: Colors.white),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _isListening ? "Listening..." : "Hold to Ask",
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      // Spoon loop button ("Press to Find")
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            debugPrint("🟥 Identify Spoon: Button tapped. Current looping state: $_isLooping");
+
+                            if (_isLooping) {
+                              setState(() => _isLooping = false);
+                              _loopTimer?.cancel();
+                              debugPrint("⛔ Stopping spoon identification loop.");
+                            } else {
+                              setState(() => _isLooping = true);
+                              debugPrint("🔁 Starting spoon identification loop.");
+                              startFixedLoop();
+                            }
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeInOut,
+                            decoration: BoxDecoration(
+                              color: _isLooping ? Colors.redAccent : Colors.deepPurpleAccent,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                if (_isLooping)
+                                  BoxShadow(
+                                    color: Colors.redAccent.withOpacity(0.6),
+                                    blurRadius: 12,
+                                    spreadRadius: 2,
+                                  ),
+                              ],
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.search, size: 24, color: Colors.white),
+                                const SizedBox(width: 8),
+                                Text(
+                                  "Press to Find",
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
                   Container(
