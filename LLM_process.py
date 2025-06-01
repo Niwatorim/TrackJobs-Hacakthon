@@ -9,9 +9,11 @@ LLM take input
 
 def LLM_proc(data, user,chain):
     if "where" in user.lower():
-        response = "Tell the location of the spoon only, in one sentence"
+        response = "Say the location of the spoon and if it is close or not, in one sentence"
     elif "cutlery" in user.lower():
         response = "If any cutlery is found, say only that it exists and its direction"
+    elif "is this" in user.lower():
+        response = "Only respond if it is an object or not"
     else:
         response = ""
 

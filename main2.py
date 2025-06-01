@@ -17,6 +17,8 @@ You are assistance to blind people, and need to answer questions about the objec
 Details: {data}
 Extra information: {response}
 Here is the user request: {user}
+**RETURN NOTHING ELSE BUT THE RESPONSE TO USER QUERY**
+**DONT RETURN A DISTANCE UNLESS ASKED EXPLICITLY**
 """)
 chain = template | model
 
@@ -98,6 +100,8 @@ def find():
         text += "It's still a bit far, please go a bit more forward."
     elif distance <= 0.5:
         text += "It's within arm's reach!"
+    text += " It's " + str(round(float(distance), 2)) + " meters away."
+
 
     print("completed object")
     debug_info = f"Closest object is {closest_obj.cls}, Direction is {direction}, Distance {distance}"
@@ -126,15 +130,30 @@ def webcam():
     if not obj:
             return jsonify({"msg": "No object detected"}), 200
     
-    if len(objects)==1:
-        data = f"object detect is {obj}, Direction is {direction}, Distance {distance}"
+    obj=objects[0].cls
+    direction=objects[0].direction
+    distance=objects[0].distance
+    if distance<= 0.5:
+        reach="Its within arms reach!"
+    elif distance>0.6 or distance < 1.5:
+        reach = "its a few steps away"
     else:
-        data="There are multiple objects\n"
-        for o in objects:
-            objeck = o.cls
-            direction = o.direction
-            distance = o.distance
-            data += f"object detected is {objeck}, Direction is {direction}, Distance {distance}\n"
+        reach = "its far"
+    data = f"object detect is {obj}, Direction is {direction}, Distance {distance}, {reach}"
+
+
+    # if len(objects)==1:
+    #     obj=objects[0].cls
+    #     direction=objects[0].direction
+    #     distance=objects[0].distance
+    #     data = f"object detect is {obj}, Direction is {direction}, Distance {distance}"
+    # else:
+    #     data="There are multiple objects\n"
+    #     for o in objects:
+    #         objeck = o.cls
+    #         direction = o.direction
+    #         distance = o.distance
+    #         data += f"object detected is {objeck}, Direction is {direction}, Distance {distance}\n"
 
     print("completed object")
 
